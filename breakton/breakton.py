@@ -201,6 +201,15 @@ class Breakton(Game2D):
         self.ball = Ball(self.playfield.size.clone() * 0.5, Vector2(10, 10), self.playfield, self.paddleMaxAngleDeflection)
         self.add_game_object(self.ball)
 
+    def early_update(self, elapsedtime: float, keys: dict):
+        pass
+
+    def late_update(self, elapsedtime: float, keys: dict):
+        pass
+
+    def draw(self):
+        pass
+
 
 if __name__ == "__main__":
 

@@ -304,6 +304,8 @@ class Game2D:
             if entity.active:
                 entity.update(elapsedtime, keys)
 
+        self.calculate_collisions()
+
         self.late_update(elapsedtime, keys)
 
         for obj in self.game_objects_to_remove:
@@ -314,8 +316,7 @@ class Game2D:
     def early_update(self, elapsedtime: float, keys: dict):
         pass
 
-    @abstractmethod
-    def late_update(self, elapsedtime: float, keys: dict):
+    def calculate_collisions(self):
         for i in range(COLLISION_MATRIX_DEPTH):
             for j in range(i, COLLISION_MATRIX_DEPTH):
                 if self.collision_enabled_between_layers(i, j):
@@ -326,6 +327,10 @@ class Game2D:
                             if ob1 != ob2 and ob1.get_collider().intersects(ob2.get_collider()):
                                 ob1.on_collision(ob2)
                                 ob2.on_collision(ob1)
+
+    @abstractmethod
+    def late_update(self, elapsedtime: float, keys: dict):
+        pass
 
     def __main_draw(self):
         self.screen.fill(self.backgroundColor)
