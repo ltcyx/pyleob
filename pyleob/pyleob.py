@@ -289,11 +289,17 @@ class Game2D:
 
         self.entities_by_collision_layer[layer].append(game_object)
 
-    def get_mask_value_for_layer(self, layer: int):
+    def get_mask_value_for_layer(self, layer: int) -> int:
         return 1 << layer
 
-    def collision_enabled_between_layers(self, layer1:int, layer2:int):
+    def collision_enabled_between_layers(self, layer1:int, layer2:int) -> bool:
         return self.collision_matrix[layer1] & self.get_mask_value_for_layer(layer2) != 0
+
+    def get_entities_by_collision_layer(self, layer:int) -> [GameObject]:
+        if layer in self.entities_by_collision_layer.keys():
+            return self.entities_by_collision_layer[layer]
+        else:
+            return []
 
     def __main_update(self, elapsedtime: float):
         keys = pygame.key.get_pressed()
@@ -320,8 +326,8 @@ class Game2D:
         for i in range(COLLISION_MATRIX_DEPTH):
             for j in range(i, COLLISION_MATRIX_DEPTH):
                 if self.collision_enabled_between_layers(i, j):
-                    layer1 = self.entities_by_collision_layer[i]
-                    layer2 = self.entities_by_collision_layer[j]
+                    layer1 = self.get_entities_by_collision_layer(i)
+                    layer2 = self.get_entities_by_collision_layer(j)
                     for ob1 in layer1:
                         for ob2 in layer2:
                             if ob1 != ob2 and ob1.get_collider().intersects(ob2.get_collider()):

@@ -1,7 +1,9 @@
 #!/bin/python
 
+from __future__ import annotations
 import pygame
 import math
+import random
 from enum import Enum
 from typing import Callable
 from abc import abstractmethod
@@ -10,7 +12,7 @@ from pyleob.pyleob import Game2D, Vector2, GameObject, Rectangle, Rect, Drawable
 
 class Brick(GameObject):
 
-    def __init__(self, pos: Vector2, size: Vector2, color, on_ball_collision: Callable[[GameObject], None]):
+    def __init__(self, pos: Vector2, size: Vector2, color, on_ball_collision: Callable[[Brick, Ball], None]):
         super(Brick, self).__init__(Rectangle(size.x, size.y, color), 2)
         self.drawable.pos = pos
         self._on_ball_collision = on_ball_collision
@@ -20,7 +22,7 @@ class Brick(GameObject):
 
     def on_collision(self, other: GameObject):
         if isinstance(other, Ball):
-            self._on_ball_collision(self)
+            self._on_ball_collision(self, other)
 
 
 class Paddle(GameObject):
@@ -48,7 +50,7 @@ class Paddle(GameObject):
 
 
 class Ball(GameObject):
-    def __init__(self, pos: Vector2, size: Vector2, playfield: Rect, paddleMaxAngleDeflection: float):
+    def __init__(self, pos: Vector2, size: Vector2, playfield: Rect, paddleMaxAngleDeflection: float, on_death: Callable[[Ball], None]):
         super(Ball, self).__init__(Rectangle(size.x, size.y, (255, 255, 255)), 0)
         self.drawable.pos = pos
         self.velocity = Vector2(300.0, 200.0)
@@ -57,6 +59,7 @@ class Ball(GameObject):
         self.initialVelocity = self.velocity.clone()
         self.playfield = playfield
         self.paddleMaxAngleDeflection = paddleMaxAngleDeflection
+        self.on_death = on_death
 
     def update(self, elapsedtime: float, keys: dict):
         self.lastPos = self.drawable.pos
@@ -73,8 +76,7 @@ class Ball(GameObject):
             self.drawable.pos.y = self.playfield.top
             self.velocity.y = -self.velocity.y
         if rect.bottom > self.playfield.bottom:
-            #death
-            self.reset()
+            self.on_death(self)
 
     def reset(self):
         self.drawable.pos = self.initialPos.clone()
@@ -114,12 +116,12 @@ class Ball(GameObject):
 
 
 class PowerUpToken(GameObject):
-    def __init__(self, brick: Brick, color, playfield: Rect):
-        super(PowerUpToken, self).__init__(Rectangle(brick.drawable.size.x, brick.drawable.size.y, color), 4)
+    def __init__(self, brick: Brick, color, playfield: Rect, on_paddle_collision: Callable[[PowerUpToken, Paddle], None]):
+        super(PowerUpToken, self).__init__(Rectangle(brick.drawable.size.x, brick.drawable.size.y, color), 3)
         self.drawable.pos = brick.drawable.pos.clone()
-        self.on_activation = EventHook()
         self.velocity = Vector2(0, 50)
         self.playfield = playfield
+        self.on_paddle_collision = on_paddle_collision
 
     def update(self, elapsedtime: float, keys: dict):
         self.drawable.pos += self.velocity * elapsedtime
@@ -130,8 +132,8 @@ class PowerUpToken(GameObject):
 
     def on_collision(self, other: GameObject):
         if isinstance(other, Paddle):
+            self.on_paddle_collision(self, other)
             self.handle_activation(other)
-            self.on_activation.invoke(self, other)
 
     @abstractmethod
     def handle_activation(self, paddle):
@@ -139,8 +141,8 @@ class PowerUpToken(GameObject):
 
 
 class InstantPowerUpToken(PowerUpToken):
-    def __init__(self, brick:Brick, color, playfield: Rect):
-        super(InstantPowerUpToken, self).__init__(brick, color, playfield)
+    def __init__(self, brick:Brick, color, playfield: Rect, on_paddle_collision: Callable[[PowerUpToken, Paddle], None]):
+        super(InstantPowerUpToken, self).__init__(brick, color, playfield, on_paddle_collision)
 
     @abstractmethod
     def handle_activation(self, paddle):
@@ -148,8 +150,8 @@ class InstantPowerUpToken(PowerUpToken):
 
 
 class MultiBallPowerUpToken(InstantPowerUpToken):
-    def __init__(self, brick: Brick, color, playfield: Rect):
-        super(InstantPowerUpToken, self).__init__(brick, color, playfield)
+    def __init__(self, brick: Brick, color, playfield: Rect, on_paddle_collision: Callable[[PowerUpToken, Paddle], None]):
+        super(InstantPowerUpToken, self).__init__(brick, color, playfield, on_paddle_collision)
 
     def handle_activation(self, paddle):
         pass
@@ -158,7 +160,7 @@ class MultiBallPowerUpToken(InstantPowerUpToken):
 class Breakton(Game2D):
 
     def __init__(self, screen_size: Vector2, bricks_per_row: int, rows: int):
-        super(Breakton, self).__init__("Breakton", screen_size, [0b110])
+        super(Breakton, self).__init__("Breakton", screen_size, [0b0110, 0b1001])
         self.paddleMaxAngleDeflection = math.radians(60)
 
         playfieldSize = screen_size * Vector2(0.95, 0.9)
@@ -184,8 +186,8 @@ class Breakton(Game2D):
         brick_width = (playfieldSize.x / bricks_per_row) - brick_spacing
         brick_height = 10
 
-        def kill_brick(br):
-            self.remove_game_object(br)
+        def kill_brick(brick: Brick, ball: Ball):
+            self.brick_collision(brick, ball)
 
         for i in range(0, rows):
             for j in range(0, bricks_per_row):
@@ -197,9 +199,54 @@ class Breakton(Game2D):
         self.paddle = Paddle(Vector2(80, 10), self.playfield)
         self.paddle.drawable.pos = Vector2(self.playfield.horizontal_center - self.paddle.drawable.size.x / 2, self.playfield.bottom - self.paddle.drawable.size.y)
         self.add_game_object(self.paddle)
+        self.balls = []
 
-        self.ball = Ball(self.playfield.size.clone() * 0.5, Vector2(10, 10), self.playfield, self.paddleMaxAngleDeflection)
-        self.add_game_object(self.ball)
+        self.spawn_ball(self.playfield.size.clone() * 0.5, Vector2(10, 10))
+
+    def brick_collision(self, brick: Brick, ball: Ball):
+        if random.random() < 0.5:
+            self.spawn_power_up_token(brick)
+        self.remove_game_object(brick)
+
+    def spawn_power_up_token(self, brick: Brick) -> PowerUpToken:
+        def kill_token(token: PowerUpToken, paddle: Paddle):
+            self.power_up_token_collision(token, paddle)
+
+        token = MultiBallPowerUpToken(brick, (255, 255, 0), self.playfield, kill_token)
+        self.add_game_object(token)
+        return token
+
+    def power_up_token_collision(self, token: PowerUpToken, paddle: Paddle):
+        if isinstance(token, MultiBallPowerUpToken):
+            self.spawn_ball_copy(self.balls[0], 2*math.pi / 3)
+            self.spawn_ball_copy(self.balls[0], -2*math.pi / 3)
+            self.remove_game_object(token)
+
+    def spawn_initial_ball(self):
+        self.spawn_ball(self.playfield.size.clone() * 0.5, Vector2(10, 10))
+
+    def spawn_ball(self, pos:Vector2, size:Vector2) -> Ball:
+        def kill_ball(ball: Ball):
+            self.ball_death(ball)
+
+        ball = Ball(pos, size, self.playfield, self.paddleMaxAngleDeflection, kill_ball)
+        self.add_game_object(ball)
+        self.balls.append(ball)
+
+        return ball
+
+    def spawn_ball_copy(self, original: Ball, angle_delta: float):
+        ball = self.spawn_ball(original.drawable.pos.clone(), original.drawable.size.clone())
+        velocity = original.velocity.clone()
+        angle = velocity.angle
+        magnitude = velocity.magnitude
+        ball.velocity = Vector2.from_angle_magnitude(angle + angle_delta, magnitude)
+
+    def ball_death(self, ball: Ball):
+        self.balls.remove(ball)
+        self.remove_game_object(ball)
+        if len(self.balls) == 0:
+            self.spawn_initial_ball()
 
     def early_update(self, elapsedtime: float, keys: dict):
         pass
