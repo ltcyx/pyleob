@@ -212,10 +212,11 @@ class Breakton(Game2D):
         self.spawn_ball(self.playfield.size.clone() * 0.5, Vector2(10, 10))
 
     def brick_collision(self, brick: Brick, ball: Ball):
-        if random.random() < 0.5:
-            self.spawn_power_up_token(brick)
-        self.remove_game_object(brick)
-        self.bricks.remove(brick)
+        if brick in self.bricks:
+            if random.random() < 0.5:
+                self.spawn_power_up_token(brick)
+            self.remove_game_object(brick)
+            self.bricks.remove(brick)
 
     def spawn_power_up_token(self, brick: Brick) -> PowerUpToken:
         def kill_token(token: PowerUpToken, paddle: Paddle):
