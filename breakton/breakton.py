@@ -168,6 +168,10 @@ class Breakton(Game2D):
 
         self.playfield = Rect(playfieldPos, playfieldSize)
         self.bricks = []
+        self.balls = []
+        self.paddle = None
+        self.bricks_per_row = bricks_per_row
+        self.rows = rows
 
         #screen corners
         border_color = (40, 40, 40)
@@ -179,18 +183,23 @@ class Breakton(Game2D):
         self.add_drawable(top_edge)
         self.add_drawable(right_edge)
 
+        self.start_game()
+
+    def start_game(self):
+        playfieldSize = self.playfield.size
+
         #bricks
         brick_spacing = 4
         top_space = self.playfield.top + (self.playfield.size.y / 16) + brick_spacing / 2
         left_space = self.playfield.left + brick_spacing / 2
-        brick_width = (playfieldSize.x / bricks_per_row) - brick_spacing
+        brick_width = (playfieldSize.x / self.bricks_per_row) - brick_spacing
         brick_height = 10
 
         def kill_brick(brick: Brick, ball: Ball):
             self.brick_collision(brick, ball)
 
-        for i in range(0, rows):
-            for j in range(0, bricks_per_row):
+        for i in range(0, self.rows):
+            for j in range(0, self.bricks_per_row):
                 brick = Brick(Vector2(left_space + (j * (brick_width + brick_spacing)), top_space + (i * (brick_height + brick_spacing))),
                               Vector2(brick_width, brick_height), (255, 255, 255), kill_brick)
                 self.add_game_object(brick)
@@ -199,7 +208,6 @@ class Breakton(Game2D):
         self.paddle = Paddle(Vector2(80, 10), self.playfield)
         self.paddle.drawable.pos = Vector2(self.playfield.horizontal_center - self.paddle.drawable.size.x / 2, self.playfield.bottom - self.paddle.drawable.size.y)
         self.add_game_object(self.paddle)
-        self.balls = []
 
         self.spawn_ball(self.playfield.size.clone() * 0.5, Vector2(10, 10))
 
@@ -207,6 +215,7 @@ class Breakton(Game2D):
         if random.random() < 0.5:
             self.spawn_power_up_token(brick)
         self.remove_game_object(brick)
+        self.bricks.remove(brick)
 
     def spawn_power_up_token(self, brick: Brick) -> PowerUpToken:
         def kill_token(token: PowerUpToken, paddle: Paddle):
@@ -218,8 +227,11 @@ class Breakton(Game2D):
 
     def power_up_token_collision(self, token: PowerUpToken, paddle: Paddle):
         if isinstance(token, MultiBallPowerUpToken):
-            self.spawn_ball_copy(self.balls[0], 2*math.pi / 3)
-            self.spawn_ball_copy(self.balls[0], -2*math.pi / 3)
+            ball = self.balls[0]
+            # shoot main ball straight down
+            ball.velocity = Vector2.from_angle_magnitude(math.pi/2, ball.velocity.magnitude)
+            self.spawn_ball_copy(ball, 2*math.pi / 3)
+            self.spawn_ball_copy(ball, -2*math.pi / 3)
             self.remove_game_object(token)
 
     def spawn_initial_ball(self):

@@ -267,17 +267,20 @@ class Game2D:
         self.entities.append(entity)
 
     def remove_entity(self, entity: Entity):
-        self.entities.remove(entity)
+        if entity in self.entities:
+            self.entities.remove(entity)
 
     def add_drawable(self, drawable: Drawable):
         self.drawables.append(drawable)
 
     def remove_drawable(self, drawable: Drawable):
-        self.drawables.remove(drawable)
+        if drawable in self.drawables:
+            self.drawables.remove(drawable)
 
     def remove_game_object_from_collision_layer(self, game_object: GameObject):
         if game_object.collision_layer >= 0:
-            self.entities_by_collision_layer[game_object.collision_layer].remove(game_object)
+            if game_object in self.entities_by_collision_layer[game_object.collision_layer]:
+                self.entities_by_collision_layer[game_object.collision_layer].remove(game_object)
 
     def add_game_object_to_collision_layer(self, game_object: GameObject):
         if game_object.collision_layer >= 0:
